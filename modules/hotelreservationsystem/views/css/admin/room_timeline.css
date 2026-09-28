@@ -1,0 +1,313 @@
+#qlo-room-timeline {
+    --qlo-day-width: 72px;
+    --qlo-room-width: 210px;
+    color: #344054;
+}
+
+.qlo-stay-price-preview {
+    margin: 14px 15px 0;
+}
+
+#qlo-room-timeline .qlo-timeline-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+    margin: 0 0 16px;
+    padding: 18px;
+    background: #fff;
+    border: 1px solid #d9e0e7;
+    border-radius: 6px;
+}
+
+#qlo-room-timeline .qlo-timeline-title {
+    flex: 1 1 280px;
+}
+
+#qlo-room-timeline .qlo-timeline-title h2 {
+    margin: 0 0 5px;
+    color: #263445;
+    font-size: 21px;
+    font-weight: 600;
+}
+
+#qlo-room-timeline .qlo-timeline-title p {
+    margin: 0;
+    color: #667085;
+}
+
+#qlo-room-timeline .qlo-timeline-controls,
+#qlo-room-timeline .qlo-timeline-navigation {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+}
+
+#qlo-room-timeline .qlo-timeline-controls label {
+    margin: 0 2px 0 8px;
+    white-space: nowrap;
+}
+
+#qlo-room-timeline .qlo-timeline-controls select {
+    width: auto;
+    min-width: 150px;
+    max-width: 230px;
+}
+
+#qlo-room-timeline .qlo-timeline-navigation input[type="date"] {
+    width: 150px;
+}
+
+#qlo-room-timeline .qlo-timeline-help {
+    margin-bottom: 12px;
+}
+
+#qlo-room-timeline .qlo-timeline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    min-height: 32px;
+    margin-bottom: 9px;
+    color: #596579;
+    font-size: 12px;
+}
+
+#qlo-room-timeline .qlo-timeline-legend > span:not(.qlo-timeline-message) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+#qlo-room-timeline .qlo-legend-dot {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+}
+
+#qlo-room-timeline .qlo-status-assigned { background: #3486d8; }
+#qlo-room-timeline .qlo-status-checked-in { background: #239a73; }
+#qlo-room-timeline .qlo-status-checked-out { background: #68778c; }
+#qlo-room-timeline .qlo-status-inactive { background: #9da8b6; }
+
+#qlo-room-timeline .qlo-timeline-message {
+    margin-left: auto;
+}
+
+#qlo-room-timeline .qlo-timeline-scroll {
+    max-width: 100%;
+    overflow: auto;
+    background: #fff;
+    border: 1px solid #d9e0e7;
+    border-radius: 5px;
+}
+
+#qlo-room-timeline .qlo-timeline-grid {
+    width: max-content;
+}
+
+#qlo-room-timeline .qlo-timeline-header-row,
+#qlo-room-timeline .qlo-timeline-room-row {
+    display: grid;
+    grid-template-columns: var(--qlo-room-width) 1fr;
+}
+
+#qlo-room-timeline .qlo-timeline-header-row {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    min-height: 45px;
+    background: #f4f7fa;
+    border-bottom: 1px solid #cfd8e2;
+}
+
+#qlo-room-timeline .qlo-timeline-room-heading,
+#qlo-room-timeline .qlo-timeline-room-label {
+    position: sticky;
+    left: 0;
+    z-index: 4;
+    width: var(--qlo-room-width);
+    box-sizing: border-box;
+    background: #f8fafc;
+    border-right: 1px solid #d9e0e7;
+}
+
+#qlo-room-timeline .qlo-timeline-room-heading {
+    z-index: 6;
+    background: #edf2f7;
+}
+
+#qlo-room-timeline .qlo-timeline-days-header,
+#qlo-room-timeline .qlo-timeline-lane-days {
+    display: grid;
+    grid-template-columns: repeat(var(--qlo-days), var(--qlo-day-width));
+    width: 100%;
+}
+
+#qlo-room-timeline .qlo-timeline-day-heading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 6px 2px;
+    color: #536273;
+    font-size: 11px;
+    font-weight: 600;
+    border-right: 1px solid #e2e8ef;
+}
+
+#qlo-room-timeline .qlo-timeline-day-heading.qlo-timeline-today,
+#qlo-room-timeline .qlo-timeline-day-cell.qlo-timeline-today {
+    background-color: #fff7dc;
+}
+
+#qlo-room-timeline .qlo-timeline-room-row {
+    min-height: 54px;
+    border-bottom: 1px solid #e6ebf0;
+}
+
+#qlo-room-timeline .qlo-timeline-room-row:last-child {
+    border-bottom: 0;
+}
+
+#qlo-room-timeline .qlo-timeline-room-label {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 10px;
+    color: #344054;
+    font-size: 12px;
+}
+
+#qlo-room-timeline .qlo-room-type-name,
+#qlo-room-timeline .qlo-room-floor {
+    overflow: hidden;
+    color: #7a8796;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#qlo-room-timeline .qlo-room-unavailable {
+    background: #f1f2f4;
+    color: #929ca8;
+}
+
+#qlo-room-timeline .qlo-timeline-lane {
+    position: relative;
+    box-sizing: border-box;
+    min-height: 54px;
+    transition: background-color .15s ease;
+}
+
+#qlo-room-timeline .qlo-timeline-lane-days {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+}
+
+#qlo-room-timeline .qlo-timeline-day-cell {
+    box-sizing: border-box;
+    border-right: 1px solid #e8edf2;
+}
+
+#qlo-room-timeline .qlo-timeline-lane.qlo-drop-target {
+    background-color: #eaf4ff;
+    outline: 2px dashed #3885d6;
+    outline-offset: -3px;
+}
+
+#qlo-room-timeline .qlo-timeline-booking {
+    position: absolute;
+    z-index: 2;
+    box-sizing: border-box;
+    min-width: 42px;
+    height: 40px;
+    overflow: hidden;
+    padding: 4px 22px 3px 7px;
+    border-left: 4px solid rgba(0, 0, 0, .15);
+    border-radius: 4px;
+    color: #fff;
+    cursor: default;
+    font-size: 10px;
+    line-height: 15px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .18);
+}
+
+#qlo-room-timeline .qlo-timeline-booking[draggable="true"] {
+    cursor: grab;
+}
+
+#qlo-room-timeline .qlo-timeline-booking.qlo-dragging {
+    opacity: .4;
+    cursor: grabbing;
+}
+
+#qlo-room-timeline .qlo-timeline-booking.qlo-status-assigned { background: #3486d8; }
+#qlo-room-timeline .qlo-timeline-booking.qlo-status-checked-in { background: #239a73; }
+#qlo-room-timeline .qlo-timeline-booking.qlo-status-checked-out { background: #68778c; }
+#qlo-room-timeline .qlo-timeline-booking.qlo-status-inactive { background: #929daa; }
+
+#qlo-room-timeline .qlo-timeline-booking-title,
+#qlo-room-timeline .qlo-timeline-booking-dates {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#qlo-room-timeline .qlo-timeline-booking-title {
+    font-weight: 600;
+}
+
+#qlo-room-timeline .qlo-timeline-booking-dates {
+    opacity: .9;
+}
+
+#qlo-room-timeline .qlo-timeline-edit {
+    position: absolute;
+    top: 5px;
+    right: 4px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, .18);
+    color: #fff;
+    line-height: 18px;
+    text-align: center;
+}
+
+#qlo-room-timeline .qlo-timeline-edit:hover,
+#qlo-room-timeline .qlo-timeline-edit:focus {
+    background: rgba(255, 255, 255, .35);
+}
+
+#qlo-room-timeline .qlo-timeline-loading,
+#qlo-room-timeline .qlo-timeline-empty {
+    padding: 24px;
+    color: #697586;
+    text-align: center;
+}
+
+@media (max-width: 767px) {
+    #qlo-room-timeline .qlo-timeline-toolbar {
+        align-items: stretch;
+        padding: 12px;
+    }
+    #qlo-room-timeline .qlo-timeline-controls,
+    #qlo-room-timeline .qlo-timeline-navigation {
+        width: 100%;
+    }
+    #qlo-room-timeline .qlo-timeline-controls select {
+        flex: 1 1 130px;
+        min-width: 0;
+    }
+    #qlo-room-timeline .qlo-timeline-message {
+        width: 100%;
+        margin-left: 0;
+    }
+}
