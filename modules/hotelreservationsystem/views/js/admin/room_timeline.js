@@ -305,11 +305,13 @@
                 return selectedType === '0' || String(room.id_product) === selectedType;
             });
 
-            grid.empty()
-                .css('--qlo-days', days)
-                .css('--qlo-room-width', roomColumnWidth + 'px')
-                .css('--qlo-day-width', dayWidth + 'px')
-                .css('width', (roomColumnWidth + days * dayWidth) + 'px');
+            grid.empty();
+            // Set CSS custom properties through the native API: older jQuery versions
+            // used by some QloApps/XAMPP installs can turn numeric custom values into invalid CSS.
+            grid[0].style.setProperty('--qlo-days', String(days));
+            grid[0].style.setProperty('--qlo-room-width', roomColumnWidth + 'px');
+            grid[0].style.setProperty('--qlo-day-width', dayWidth + 'px');
+            grid.css('width', (roomColumnWidth + days * dayWidth) + 'px');
 
             var header = $('<div/>', { 'class': 'qlo-timeline-header-row' });
             header.append($('<div/>', { 'class': 'qlo-timeline-room-heading', text: ' ' }));
