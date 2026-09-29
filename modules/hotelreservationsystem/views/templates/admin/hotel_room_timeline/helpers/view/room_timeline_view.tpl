@@ -19,6 +19,9 @@
     data-l-difference="{l s='Difference to settle manually' mod='hotelreservationsystem'}"
     data-l-date-save-success="{l s='Stay updated and order totals recalculated. Any balance or refund must be settled manually.' mod='hotelreservationsystem'}"
     data-l-date-save-error="{l s='The stay could not be updated.' mod='hotelreservationsystem'}"
+    data-l-room-after-save="{l s='After saving the new dates, the booking will also be moved to the selected room.' mod='hotelreservationsystem'}"
+    data-l-date-room-move-error="{l s='The dates were saved, but the room move failed. Verify the booking assignment before retrying.' mod='hotelreservationsystem'}"
+    data-l-date-room-move-success="{l s='Stay dates updated and booking moved to the selected room. Order totals recalculated; settle any balance or refund manually.' mod='hotelreservationsystem'}"
     data-l-preview-note="{l s='The estimate follows the order editor pricing rules. Tourism tax is calculated separately where enabled; any balance or refund must be settled manually.' mod='hotelreservationsystem'}">
     <div class="qlo-timeline-toolbar">
         <div class="qlo-timeline-title">
@@ -48,7 +51,7 @@
 
     <div class="qlo-timeline-help alert alert-info">
         <strong>{l s='Tip:' mod='hotelreservationsystem'}</strong>
-        {l s='Drag an active booking to another room of the same room type to reassign it. Use Edit stay to change check-in or check-out dates. The existing order editor recalculates the order; any balance or refund is settled manually by reception.' mod='hotelreservationsystem'}
+        {l s='Drag an active booking horizontally to change its stay dates, or to another room of the same type to reassign it. Confirm date changes in the editor. Empty cells do not create bookings; use Book Now for new reservations. The order is recalculated and any balance or refund is settled manually by reception.' mod='hotelreservationsystem'}
     </div>
 
     <div class="qlo-timeline-legend">

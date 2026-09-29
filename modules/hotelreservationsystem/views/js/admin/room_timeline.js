@@ -16,6 +16,10 @@
         var currentData = null;
         var dragBooking = null;
         var activeEditBooking = null;
+        var pendingStayDates = null;
+        var pendingRoomMove = null;
+        var dragOffsetDays = 0;
+        var dragClippedDays = 0;
         var previewTimer = null;
         var previewSequence = 0;
         var dayWidth = 72;
@@ -105,6 +109,13 @@
                 card.attr('draggable', 'true');
                 card.on('dragstart', function (event) {
                     dragBooking = booking;
+                    var cardRect = card[0].getBoundingClientRect();
+                    var pointerX = event.originalEvent.clientX || cardRect.left;
+                    dragOffsetDays = Math.max(0, Math.floor((pointerX - cardRect.left) / dayWidth));
+                    var bookingStart = booking.product_line_data.date_from;
+                    dragClippedDays = bookingStart < currentData.start_date
+                        ? dayOffset(bookingStart, currentData.start_date)
+                        : 0;
                     event.originalEvent.dataTransfer.effectAllowed = 'move';
                     event.originalEvent.dataTransfer.setData('text/plain', String(booking.id));
                     card.addClass('qlo-dragging');
@@ -118,12 +129,16 @@
             return card;
         }
 
-        function openBookingEditor(booking) {
+        function openBookingEditor(booking, stayDates, targetRoomId) {
             if (typeof EditRoomBookingModal === 'undefined' || !EditRoomBookingModal.show) {
                 message(root.data('l-load-error'), 'error');
                 return;
             }
             activeEditBooking = booking;
+            pendingStayDates = stayDates || null;
+            pendingRoomMove = targetRoomId && parseInt(targetRoomId, 10) !== parseInt(booking.id_room, 10)
+                ? { booking: booking, targetRoomId: parseInt(targetRoomId, 10) }
+                : null;
             var button = document.createElement('button');
             button.setAttribute('data-product_line_data', JSON.stringify(booking.product_line_data));
             EditRoomBookingModal.show(button);
@@ -143,6 +158,9 @@
             }
 
             preview.removeClass('alert-danger').addClass('alert-info').text('…');
+            if (pendingRoomMove) {
+                $('#submitRoomChange').prop('disabled', true);
+            }
             $.ajax({
                 url: root.data('ajax-url'),
                 method: 'POST',
@@ -151,6 +169,7 @@
                     ajax: 1,
                     action: 'previewStayChange',
                     id_booking: activeEditBooking.id,
+                    target_room_id: pendingRoomMove ? pendingRoomMove.targetRoomId : activeEditBooking.id_room,
                     date_from: dateFrom,
                     date_to: dateTo,
                     unit_price_tax_excl: unitPrice
@@ -163,9 +182,15 @@
                     preview.removeClass('alert-info').addClass('alert-danger').text((response && response.error) || root.data('l-load-error'));
                     return;
                 }
+                if (pendingRoomMove) {
+                    $('#submitRoomChange').prop('disabled', false);
+                }
                 var summary = root.data('l-price-preview') + ': ' + root.data('l-old-total') + ' ' + response.old_total
                     + ' → ' + root.data('l-new-total') + ' ' + response.new_total
                     + ' (' + root.data('l-difference') + ': ' + response.difference + '). ' + root.data('l-preview-note');
+                if (pendingRoomMove) {
+                    summary += ' ' + root.data('l-room-after-save');
+                }
                 preview.removeClass('alert-danger').addClass('alert-info').text(summary);
             }).fail(function () {
                 if (requestSequence === previewSequence) {
@@ -189,6 +214,8 @@
                 }).insertBefore($('#edit_product .nav.nav-tabs').first());
             }
 
+            fromInput.datepicker('option', 'altFormat', 'yy-mm-dd');
+            toInput.datepicker('option', 'altFormat', 'yy-mm-dd');
             var originalFromSelect = fromInput.datepicker('option', 'onSelect');
             var originalToSelect = toInput.datepicker('option', 'onSelect');
             fromInput.datepicker('option', 'onSelect', function (dateText, instance) {
@@ -209,6 +236,18 @@
                 clearTimeout(previewTimer);
                 previewTimer = setTimeout(requestStayPricePreview, 250);
             });
+            if (pendingStayDates) {
+                var pendingFrom = $.datepicker.parseDate('yy-mm-dd', pendingStayDates.date_from);
+                var pendingTo = $.datepicker.parseDate('yy-mm-dd', pendingStayDates.date_to);
+                fromInput.datepicker('setDate', pendingFrom);
+                toInput.datepicker('setDate', pendingTo);
+                $('#edit_product .edit_product_date_from_actual').val(pendingStayDates.date_from);
+                $('#edit_product .edit_product_date_to_actual').val(pendingStayDates.date_to);
+                var minimumCheckout = new Date(pendingFrom.getTime());
+                minimumCheckout.setDate(minimumCheckout.getDate() + 1);
+                toInput.datepicker('option', 'minDate', minimumCheckout);
+                pendingStayDates = null;
+            }
             requestStayPricePreview();
         }
 
@@ -259,10 +298,17 @@
             previewSequence++;
             clearTimeout(previewTimer);
             var showSavedMessage = stayChangesSaved;
+            var followupRoomMove = showSavedMessage ? pendingRoomMove : null;
             stayChangesSaved = false;
-            loadTimeline();
-            if (showSavedMessage) {
-                message(root.data('l-date-save-success'), 'success');
+            pendingRoomMove = null;
+            pendingStayDates = null;
+            if (followupRoomMove) {
+                reallocateBooking(followupRoomMove.booking, followupRoomMove.targetRoomId, true, true);
+            } else {
+                loadTimeline();
+                if (showSavedMessage) {
+                    message(root.data('l-date-save-success'), 'success');
+                }
             }
         });
         $(document).on('shown.bs.modal', '#edit-room-booking-modal', attachStayPricePreview);
@@ -405,11 +451,33 @@
                         message(root.data('l-same-type'), 'error');
                         return;
                     }
-                    if (targetRoomId === parseInt(dragBooking.id_room, 10)) {
-                        message(root.data('l-edit-dates'), 'muted');
+                    var laneRect = lane[0].getBoundingClientRect();
+                    var dropX = event.originalEvent.clientX;
+                    var targetDay = Math.max(0, Math.min(
+                        currentData.days - 1,
+                        Math.floor((dropX - laneRect.left) / dayWidth)
+                    ));
+                    var newDateFrom = dateAtOffset(currentData.start_date, targetDay - dragOffsetDays - dragClippedDays);
+                    var stayNights = Math.max(1, dayOffset(
+                        dragBooking.product_line_data.date_from,
+                        dragBooking.product_line_data.date_to
+                    ));
+                    var newDateTo = dateAtOffset(newDateFrom, stayNights);
+                    var datesChanged = newDateFrom !== dragBooking.product_line_data.date_from
+                        || newDateTo !== dragBooking.product_line_data.date_to;
+                    var roomChanged = targetRoomId !== parseInt(dragBooking.id_room, 10);
+
+                    if (!datesChanged && !roomChanged) {
                         return;
                     }
-                    reallocateBooking(dragBooking, targetRoomId);
+                    if (datesChanged) {
+                        openBookingEditor(dragBooking, {
+                            date_from: newDateFrom,
+                            date_to: newDateTo
+                        }, targetRoomId);
+                    } else {
+                        reallocateBooking(dragBooking, targetRoomId);
+                    }
                 });
 
                 row.append(lane);
@@ -455,8 +523,8 @@
             });
         }
 
-        function reallocateBooking(booking, targetRoomId) {
-            if (!window.confirm(root.data('l-confirm-move'))) {
+        function reallocateBooking(booking, targetRoomId, confirmed, afterDateChange) {
+            if (!confirmed && !window.confirm(root.data('l-confirm-move'))) {
                 return;
             }
             busy = true;
@@ -473,13 +541,20 @@
             }).done(function (response) {
                 if (response && response.success) {
                     busy = false;
-                    message(root.data('l-move-success'), 'success');
+                    message(afterDateChange ? root.data('l-date-room-move-success') : root.data('l-move-success'), 'success');
                     setTimeout(loadTimeline, 0);
                 } else {
-                    message((response && response.error) || root.data('l-move-error'), 'error');
+                    var errorText = afterDateChange ? root.data('l-date-room-move-error') : root.data('l-move-error');
+                    message((response && response.error) || errorText, 'error');
+                    if (afterDateChange) {
+                        setTimeout(loadTimeline, 0);
+                    }
                 }
             }).fail(function () {
-                message(root.data('l-move-error'), 'error');
+                message(afterDateChange ? root.data('l-date-room-move-error') : root.data('l-move-error'), 'error');
+                if (afterDateChange) {
+                    setTimeout(loadTimeline, 0);
+                }
             }).always(function () {
                 busy = false;
             });

@@ -296,6 +296,10 @@ class AdminHotelRoomTimelineController extends ModuleAdminController
         $rawBookingId = Tools::getValue('id_booking');
         $idBooking = is_scalar($rawBookingId) && Validate::isUnsignedId((string) $rawBookingId) ? (int) $rawBookingId : 0;
         $booking = new HotelBookingDetail($idBooking);
+        $rawTargetRoomId = Tools::getValue('target_room_id');
+        $targetRoomId = is_scalar($rawTargetRoomId) && Validate::isUnsignedId((string) $rawTargetRoomId)
+            ? (int) $rawTargetRoomId
+            : (int) $booking->id_room;
         $dateFrom = $this->parseIsoDate(Tools::getValue('date_from'));
         $dateTo = $this->parseIsoDate(Tools::getValue('date_to'));
         $rawUnitPrice = Tools::getValue('unit_price_tax_excl', '');
@@ -329,6 +333,17 @@ class AdminHotelRoomTimelineController extends ModuleAdminController
         if (!Validate::isLoadedObject($room)) {
             $this->sendJson(array('success' => false, 'error' => $this->l('The assigned room could not be loaded.')));
         }
+        $targetRoom = $targetRoomId === (int) $booking->id_room
+            ? $room
+            : new HotelRoomInformation($targetRoomId);
+        if (!Validate::isLoadedObject($targetRoom)
+            || (int) $targetRoom->id_hotel !== (int) $booking->id_hotel
+            || (int) $targetRoom->id_product !== (int) $booking->id_product
+            || ($targetRoomId !== (int) $booking->id_room
+                && (int) $targetRoom->id_status !== HotelRoomInformation::STATUS_ACTIVE)
+        ) {
+            $this->sendJson(array('success' => false, 'error' => $this->l('The selected room is not a valid destination for this booking.')));
+        }
 
         $startDateTime = $dateFrom.' 00:00:00';
         $endDateTime = $dateTo.' 00:00:00';
@@ -356,6 +371,33 @@ class AdminHotelRoomTimelineController extends ModuleAdminController
         );
         if ($disabled) {
             $this->sendJson(array('success' => false, 'error' => $this->l('The room is blocked for maintenance during part of the selected stay.')));
+        }
+        if ($targetRoomId !== (int) $booking->id_room) {
+            $targetConflict = Db::getInstance()->getValue(
+                'SELECT b.`id` FROM `'._DB_PREFIX_.'htl_booking_detail` b
+                WHERE b.`id_room` = '.(int) $targetRoomId.'
+                    AND b.`id` != '.(int) $idBooking.'
+                    AND b.`is_back_order` = 0
+                    AND b.`id` NOT IN ('.$refundedSubquery.')
+                    AND b.`date_from` < \''.pSQL($endDateTime).'\'
+                    AND IF(b.`id_status` = '.(int) HotelBookingDetail::STATUS_CHECKED_OUT.', b.`check_out`, b.`date_to`) > \''.pSQL($startDateTime).'\'
+                LIMIT 1',
+                false
+            );
+            if ($targetConflict) {
+                $this->sendJson(array('success' => false, 'error' => $this->l('The destination room is already occupied during part of the selected stay.')));
+            }
+            $targetDisabled = Db::getInstance()->getValue(
+                'SELECT `id` FROM `'._DB_PREFIX_.'htl_room_disable_dates`
+                WHERE `id_room` = '.(int) $targetRoomId.'
+                    AND `date_from` < \''.pSQL($endDateTime).'\'
+                    AND `date_to` > \''.pSQL($startDateTime).'\'
+                LIMIT 1',
+                false
+            );
+            if ($targetDisabled) {
+                $this->sendJson(array('success' => false, 'error' => $this->l('The destination room is blocked for maintenance during part of the selected stay.')));
+            }
         }
 
         $nights = max(1, (int) HotelHelper::getNumberOfDays($startDateTime, $endDateTime));
