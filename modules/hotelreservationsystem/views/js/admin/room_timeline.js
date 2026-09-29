@@ -13,7 +13,13 @@
         var typeSelect = $('#qlo-timeline-room-type');
         var rangeDays = Math.max(1, parseInt(root.data('days'), 10) || 14);
         var canEdit = String(root.data('can-edit')) === '1';
+        var canBook = String(root.data('can-book')) === '1';
+        var modeSelect = $('#qlo-timeline-mode');
+        var plannerMode = modeSelect.length && modeSelect.val() === 'create' ? 'create' : 'manage';
+        root.toggleClass('qlo-mode-create', plannerMode === 'create');
         var currentData = null;
+        var activeSelection = null;
+        var activeResize = null;
         var dragBooking = null;
         var activeEditBooking = null;
         var pendingStayDates = null;
@@ -89,7 +95,7 @@
             dates.text(booking.date_from + ' – ' + booking.date_to);
             card.append(dates);
 
-            if (booking.editable) {
+            if (booking.editable && plannerMode === 'manage') {
                 var edit = $('<button/>', {
                     type: 'button',
                     'class': 'qlo-timeline-edit',
@@ -105,9 +111,41 @@
                 card.append(edit);
             }
 
-            if (isDraggable(booking)) {
+            if (plannerMode === 'manage' && isDraggable(booking)) {
+                ['start', 'end'].forEach(function (edge) {
+                    var handle = $('<span/>', {
+                        'class': 'qlo-timeline-resize-handle qlo-resize-' + edge,
+                        'aria-label': edge === 'start' ? root.data('l-resize-checkin') : root.data('l-resize-checkout'),
+                        title: edge === 'start' ? root.data('l-resize-checkin') : root.data('l-resize-checkout')
+                    });
+                    handle.on('mousedown', function (event) {
+                        if (event.which !== 1 || activeResize) {
+                            return;
+                        }
+                        event.preventDefault();
+                        event.stopPropagation();
+                        dragBooking = null;
+                        activeResize = {
+                            booking: booking,
+                            card: card,
+                            edge: edge,
+                            startX: event.clientX,
+                            dateFrom: booking.product_line_data.date_from,
+                            dateTo: booking.product_line_data.date_to,
+                            originalFrom: booking.product_line_data.date_from,
+                            originalTo: booking.product_line_data.date_to
+                        };
+                        card.addClass('qlo-resizing');
+                    });
+                    card.append(handle);
+                });
+
                 card.attr('draggable', 'true');
                 card.on('dragstart', function (event) {
+                    if ($(event.originalEvent.target).closest('.qlo-timeline-resize-handle').length) {
+                        event.preventDefault();
+                        return;
+                    }
                     dragBooking = booking;
                     var cardRect = card[0].getBoundingClientRect();
                     var pointerX = event.originalEvent.clientX || cardRect.left;
@@ -334,6 +372,94 @@
             return { items: visible, count: Math.max(1, tracks.length) };
         }
 
+        function updateResizedCard(resize) {
+            var visibleStart = currentData.start_date;
+            var visibleEnd = dateAtOffset(visibleStart, currentData.days);
+            var drawStart = resize.dateFrom < visibleStart ? visibleStart : resize.dateFrom;
+            var drawEnd = resize.dateTo > visibleEnd ? visibleEnd : resize.dateTo;
+            if (drawEnd <= drawStart) {
+                return;
+            }
+            var left = dayOffset(visibleStart, drawStart);
+            var length = dayOffset(drawStart, drawEnd);
+            resize.card.css({
+                left: (left * dayWidth + 3) + 'px',
+                width: Math.max(42, length * dayWidth - 6) + 'px'
+            });
+            resize.card.find('.qlo-timeline-booking-dates').text(resize.dateFrom + ' – ' + resize.dateTo);
+        }
+
+        function selectionDay(lane, clientX) {
+            var rect = lane[0].getBoundingClientRect();
+            return Math.max(0, Math.min(
+                currentData.days - 1,
+                Math.floor((clientX - rect.left) / dayWidth)
+            ));
+        }
+
+        function updateSelection(day) {
+            if (!activeSelection) {
+                return;
+            }
+            activeSelection.currentDay = day;
+            var firstDay = Math.min(activeSelection.startDay, day);
+            var lastDay = Math.max(activeSelection.startDay, day);
+            var overlay = activeSelection.overlay;
+            overlay.css({
+                left: (firstDay * dayWidth) + 'px',
+                width: ((lastDay - firstDay + 1) * dayWidth) + 'px'
+            });
+        }
+
+        function clearSelection() {
+            if (activeSelection && activeSelection.overlay) {
+                activeSelection.overlay.remove();
+            }
+            activeSelection = null;
+            $('.qlo-timeline-lane').removeClass('qlo-selecting');
+        }
+
+        function checkAvailabilityAndOpenBooking(selection) {
+            var dateFrom = dateAtOffset(currentData.start_date, selection.firstDay);
+            var dateTo = dateAtOffset(currentData.start_date, selection.lastDay + 1);
+            busy = true;
+            modeSelect.prop('disabled', true);
+            message('', 'muted');
+
+            $.ajax({
+                url: root.data('ajax-url'),
+                method: 'POST',
+                dataType: 'json',
+                data: {
+                    ajax: 1,
+                    action: 'checkNewStayAvailability',
+                    id_room: selection.roomId,
+                    date_from: dateFrom,
+                    date_to: dateTo
+                }
+            }).done(function (response) {
+                if (!response || !response.success) {
+                    message((response && response.error) || root.data('l-create-unavailable') || root.data('l-create-error'), 'error');
+                    return;
+                }
+                message(root.data('l-create-success'), 'success');
+                var bookingUrl = root.data('booking-url');
+                var query = $.param({
+                    id_hotel: hotelSelect.val(),
+                    id_room_type: selection.productId,
+                    id_room: selection.roomId,
+                    date_from: dateFrom,
+                    date_to: dateTo
+                });
+                window.location.href = bookingUrl + (bookingUrl.indexOf('?') === -1 ? '?' : '&') + query;
+            }).fail(function () {
+                message(root.data('l-create-error'), 'error');
+            }).always(function () {
+                busy = false;
+                modeSelect.prop('disabled', false);
+            });
+        }
+
         function render(data) {
             currentData = data;
             var startDate = data.start_date;
@@ -426,8 +552,37 @@
                     lane.append(card);
                 });
 
+                lane.on('mousedown', function (event) {
+                    if (plannerMode !== 'create' || !canBook || busy || event.which !== 1
+                        || $(event.target).closest('.qlo-timeline-booking').length
+                        || parseInt(room.id_status, 10) !== 1
+                    ) {
+                        return;
+                    }
+                    event.preventDefault();
+                    clearSelection();
+                    var startDay = selectionDay(lane, event.clientX);
+                    var overlay = $('<div/>', { 'class': 'qlo-timeline-selection' });
+                    lane.append(overlay);
+                    activeSelection = {
+                        lane: lane,
+                        roomId: parseInt(room.id, 10),
+                        productId: parseInt(room.id_product, 10),
+                        startDay: startDay,
+                        currentDay: startDay,
+                        overlay: overlay
+                    };
+                    lane.addClass('qlo-selecting');
+                    updateSelection(startDay);
+                });
+                lane.on('mousemove', function (event) {
+                    if (activeSelection && activeSelection.lane[0] === lane[0]) {
+                        updateSelection(selectionDay(lane, event.clientX));
+                    }
+                });
+
                 lane.on('dragover', function (event) {
-                    if (!dragBooking) {
+                    if (plannerMode !== 'manage' || !dragBooking) {
                         return;
                     }
                     event.preventDefault();
@@ -442,7 +597,7 @@
                 lane.on('drop', function (event) {
                     event.preventDefault();
                     lane.removeClass('qlo-drop-target');
-                    if (!dragBooking) {
+                    if (plannerMode !== 'manage' || !dragBooking) {
                         return;
                     }
                     var targetRoomId = parseInt(lane.data('room-id'), 10);
@@ -559,6 +714,72 @@
                 busy = false;
             });
         }
+
+        $(document).on('mousemove.qloTimelineResize', function (event) {
+            if (!activeResize || plannerMode !== 'manage') {
+                return;
+            }
+            var resize = activeResize;
+            var delta = Math.round((event.clientX - resize.startX) / dayWidth);
+            var nights = Math.max(1, dayOffset(resize.originalFrom, resize.originalTo));
+            if (resize.edge === 'start') {
+                delta = Math.min(nights - 1, delta);
+                resize.dateFrom = dateAtOffset(resize.originalFrom, delta);
+                resize.dateTo = resize.originalTo;
+            } else {
+                delta = Math.max(1 - nights, delta);
+                resize.dateFrom = resize.originalFrom;
+                resize.dateTo = dateAtOffset(resize.originalTo, delta);
+            }
+            updateResizedCard(resize);
+        });
+        $(document).on('mouseup.qloTimelineResize', function () {
+            if (!activeResize) {
+                return;
+            }
+            var resize = activeResize;
+            activeResize = null;
+            resize.card.removeClass('qlo-resizing');
+            if (resize.dateFrom !== resize.originalFrom || resize.dateTo !== resize.originalTo) {
+                openBookingEditor(resize.booking, {
+                    date_from: resize.dateFrom,
+                    date_to: resize.dateTo
+                });
+            } else if (currentData) {
+                render(currentData);
+            }
+        });
+
+        $(document).on('mouseup.qloTimelineSelection', function (event) {
+            if (!activeSelection) {
+                return;
+            }
+            var selection = activeSelection;
+            var endDay = selectionDay(selection.lane, event.clientX);
+            selection.lane.removeClass('qlo-selecting');
+            clearSelection();
+            if (plannerMode !== 'create' || !canBook || !currentData) {
+                return;
+            }
+            selection.firstDay = Math.min(selection.startDay, endDay);
+            selection.lastDay = Math.max(selection.startDay, endDay);
+            checkAvailabilityAndOpenBooking(selection);
+        });
+
+        modeSelect.on('change', function () {
+            plannerMode = $(this).val() === 'create' && canBook ? 'create' : 'manage';
+            root.toggleClass('qlo-mode-create', plannerMode === 'create');
+            clearSelection();
+            if (activeResize) {
+                activeResize.card.removeClass('qlo-resizing');
+                activeResize = null;
+            }
+            dragBooking = null;
+            if (currentData) {
+                render(currentData);
+            }
+            message('', 'muted');
+        });
 
         $('#qlo-timeline-prev').on('click', function () {
             startInput.val(dateAtOffset(startInput.val(), -rangeDays));

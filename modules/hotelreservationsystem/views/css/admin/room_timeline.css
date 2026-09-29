@@ -55,6 +55,10 @@
     max-width: 230px;
 }
 
+#qlo-room-timeline #qlo-timeline-mode {
+    min-width: 180px;
+}
+
 #qlo-room-timeline .qlo-timeline-navigation input[type="date"] {
     width: 150px;
 }
@@ -220,6 +224,27 @@
     outline-offset: -3px;
 }
 
+#qlo-room-timeline.qlo-mode-create .qlo-timeline-lane {
+    cursor: crosshair;
+}
+
+#qlo-room-timeline .qlo-timeline-lane.qlo-selecting {
+    user-select: none;
+    cursor: crosshair;
+}
+
+#qlo-room-timeline .qlo-timeline-selection {
+    position: absolute;
+    z-index: 1;
+    top: 2px;
+    bottom: 2px;
+    box-sizing: border-box;
+    border: 2px solid #1778cf;
+    border-radius: 4px;
+    background: rgba(23, 120, 207, .19);
+    pointer-events: none;
+}
+
 #qlo-room-timeline .qlo-timeline-booking {
     position: absolute;
     z-index: 2;
@@ -268,8 +293,9 @@
 
 #qlo-room-timeline .qlo-timeline-edit {
     position: absolute;
+    z-index: 5;
     top: 5px;
-    right: 4px;
+    right: 13px;
     width: 18px;
     height: 18px;
     padding: 0;
@@ -284,6 +310,37 @@
 #qlo-room-timeline .qlo-timeline-edit:hover,
 #qlo-room-timeline .qlo-timeline-edit:focus {
     background: rgba(255, 255, 255, .35);
+}
+
+#qlo-room-timeline .qlo-timeline-resize-handle {
+    position: absolute;
+    z-index: 4;
+    top: 0;
+    bottom: 0;
+    width: 10px;
+    background: rgba(255, 255, 255, .18);
+    cursor: ew-resize;
+}
+
+#qlo-room-timeline .qlo-timeline-resize-handle:hover,
+#qlo-room-timeline .qlo-timeline-booking.qlo-resizing .qlo-timeline-resize-handle {
+    background: rgba(255, 255, 255, .48);
+}
+
+#qlo-room-timeline .qlo-timeline-resize-handle.qlo-resize-start {
+    left: 0;
+    border-radius: 4px 0 0 4px;
+}
+
+#qlo-room-timeline .qlo-timeline-resize-handle.qlo-resize-end {
+    right: 0;
+    border-radius: 0 4px 4px 0;
+}
+
+#qlo-room-timeline .qlo-timeline-booking.qlo-resizing {
+    z-index: 6;
+    opacity: .85;
+    box-shadow: 0 0 0 2px rgba(23, 120, 207, .5);
 }
 
 #qlo-room-timeline .qlo-timeline-loading,

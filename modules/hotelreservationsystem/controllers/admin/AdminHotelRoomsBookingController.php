@@ -27,6 +27,7 @@ class AdminHotelRoomsBookingController extends ModuleAdminController
     protected $id_guest;
     protected $id_hotel;
     protected $id_room_type;
+    protected $id_room;
     protected $date_from;
     protected $date_to;
     protected $booking_product;
@@ -165,6 +166,26 @@ class AdminHotelRoomsBookingController extends ModuleAdminController
                 $id_room_type = 0;
             }
 
+            $rawIdRoom = Tools::getValue('id_room');
+            $this->id_room = is_scalar($rawIdRoom) && Validate::isUnsignedId((string) $rawIdRoom)
+                ? (int) $rawIdRoom
+                : 0;
+            if ($this->id_room) {
+                $selectedRoom = new HotelRoomInformation($this->id_room);
+                $allowedHotelIds = array_map('intval', array_column($hotelBranchesInfo, 'id'));
+                if (Validate::isLoadedObject($selectedRoom)
+                    && in_array((int) $selectedRoom->id_hotel, $allowedHotelIds)
+                    && (int) $selectedRoom->id_status === HotelRoomInformation::STATUS_ACTIVE
+                ) {
+                    // A planner hand-off is pinned to the room selected by reception.
+                    $id_hotel = (int) $selectedRoom->id_hotel;
+                    $id_room_type = (int) $selectedRoom->id_product;
+                } else {
+                    $this->errors[] = $this->l('The selected room is not available for booking.');
+                    $this->id_room = 0;
+                }
+            }
+
             $occupancy = Tools::getValue('occupancy');
             if (!Validate::isOccupancy($occupancy)) {
                 $occupancy = array();
@@ -188,6 +209,7 @@ class AdminHotelRoomsBookingController extends ModuleAdminController
                 'date_to' => $date_to,
                 'id_hotel' => $id_hotel,
                 'id_room_type' => $id_room_type,
+                'id_room' => (int) $this->id_room,
                 'occupancy' => $occupancy
             );
             Tools::redirectAdmin($this->context->link->getAdminLink('AdminHotelRoomsBooking').'&'.http_build_query($urlData));
@@ -324,6 +346,7 @@ class AdminHotelRoomsBookingController extends ModuleAdminController
             'id_hotel' => $this->id_hotel,
             'occupancy' => $this->occupancy,
             'id_room_type' => $this->id_room_type,
+            'id_room' => (int) $this->id_room,
             'booking_product' => $this->booking_product,
             'is_occupancy_wise_search' => $isOccupancyWiseSearch,
         ));
@@ -484,6 +507,10 @@ class AdminHotelRoomsBookingController extends ModuleAdminController
 
         $searchIdHotel = Tools::getValue('search_id_hotel');
         $searchIdRoomType = Tools::getValue('search_id_room_type');
+        if ($this->id_room) {
+            $searchIdHotel = $this->id_hotel;
+            $searchIdRoomType = $this->id_room_type;
+        }
         $searchDateFrom = Tools::getValue('search_date_from');
         $searchDateTo = Tools::getValue('search_date_to');
 
@@ -511,6 +538,25 @@ class AdminHotelRoomsBookingController extends ModuleAdminController
 
         $objBookingDetail = new HotelBookingDetail();
         if ($bookingData = $objBookingDetail->getBookingData($bookingParams)) {
+            if ($this->id_room && !empty($bookingData['rm_data'])) {
+                $numAvailable = 0;
+                foreach ($bookingData['rm_data'] as &$roomTypeData) {
+                    $availableRooms = isset($roomTypeData['data']['available'])
+                        ? $roomTypeData['data']['available']
+                        : array();
+                    $roomTypeData['data']['available'] = isset($availableRooms[$this->id_room])
+                        ? array($this->id_room => $availableRooms[$this->id_room])
+                        : array();
+                    $numAvailable += count($roomTypeData['data']['available']);
+                }
+                unset($roomTypeData);
+                $bookingData['stats']['total_rooms'] = 1;
+                $bookingData['stats']['num_avail'] = $numAvailable;
+                $bookingData['stats']['num_part_avai'] = 0;
+                $bookingData['stats']['num_booked'] = 0;
+                $bookingData['stats']['num_unavail'] = 0;
+                $bookingData['stats']['num_cart'] = 0;
+            }
             $this->context->smarty->assign(array('booking_data' => $bookingData));
             $tpl_path = 'hotelreservationsystem/views/templates/admin/hotel_rooms_booking/helpers/view/_partials/search-stats.tpl';
             $searchStats = $this->context->smarty->fetch(_PS_MODULE_DIR_.$tpl_path);
@@ -529,6 +575,10 @@ public function ajaxProcessGetCalenderData()
         $last_day_this_month  = date('Y-m-d', strtotime(Tools::getValue('end')));
         $searchIdHotel = Tools::getValue('search_id_hotel');
         $searchIdRoomType = Tools::getValue('search_id_room_type');
+        if ($this->id_room) {
+            $searchIdHotel = $this->id_hotel;
+            $searchIdRoomType = $this->id_room_type;
+        }
         $searchDateFrom = Tools::getValue('search_date_from');
         $searchDateTo = Tools::getValue('search_date_to');
 
@@ -560,6 +610,9 @@ public function ajaxProcessGetCalenderData()
         if (!empty($bookingData['rm_data'])) {
             $roomsByProduct = array();
             foreach (HotelRoomInformation::getHotelRoomsInfo($searchIdHotel, $searchIdRoomType) ?: array() as $room) {
+                if ($this->id_room && (int) $room['id'] !== (int) $this->id_room) {
+                    continue;
+                }
                 $roomsByProduct[$room['id_product']][$room['id']] = array(
                     'id_room' => $room['id'],
                     'room_num' => $room['room_num'],
@@ -633,8 +686,11 @@ public function ajaxProcessGetCalenderData()
             );
 
             if (!empty($bookingData['rm_data'])) {
-                $stats['total_room_type'] = $bookingData['stats']['total_room_type'];
-                $stats['total_rooms'] = $bookingData['stats']['total_rooms'];
+                $stats['total_room_type'] = $this->id_room ? 1 : $bookingData['stats']['total_room_type'];
+                $stats['total_rooms'] = $this->id_room ? 1 : $bookingData['stats']['total_rooms'];
+                if ($this->id_room) {
+                    $stats['num_cart'] = 0;
+                }
 
                 foreach ($bookingData['rm_data'] as $roomType) {
                     $allRooms = $roomType['all_rooms'] ?: array();
@@ -695,6 +751,26 @@ public function ajaxProcessGetCalenderData()
         $bookingParams['date_from'] = $searchDateFrom;
         $bookingParams['date_to'] = $searchDateTo;
         if ($bookingData = $objBookingDetail->getBookingData($bookingParams)) {
+            if ($this->id_room && !empty($bookingData['rm_data'])) {
+                foreach ($bookingData['rm_data'] as &$roomTypeData) {
+                    $availableRooms = isset($roomTypeData['data']['available'])
+                        ? $roomTypeData['data']['available']
+                        : array();
+                    $roomTypeData['data']['available'] = isset($availableRooms[$this->id_room])
+                        ? array($this->id_room => $availableRooms[$this->id_room])
+                        : array();
+                }
+                unset($roomTypeData);
+                $bookingData['stats']['total_rooms'] = 1;
+                $bookingData['stats']['num_avail'] = 0;
+                foreach ($bookingData['rm_data'] as $roomTypeData) {
+                    $bookingData['stats']['num_avail'] += count($roomTypeData['data']['available']);
+                }
+                $bookingData['stats']['num_part_avai'] = 0;
+                $bookingData['stats']['num_booked'] = 0;
+                $bookingData['stats']['num_unavail'] = 0;
+                $bookingData['stats']['num_cart'] = 0;
+            }
             if ($bookingData['stats']['num_avail']) {
                 $eventColor = $this->eventColors['available']['event'];
                 $title = sprintf($this->l('%s Available Rooms'), $bookingData['stats']['num_avail']);
@@ -958,6 +1034,30 @@ public function ajaxProcessGetCalenderData()
         $bookingParams['search_cart_rms'] = 1;
 
         $booking_data = $obj_booking_dtl->getBookingData($bookingParams);
+
+        if ($this->id_room && !empty($booking_data['rm_data'])) {
+            foreach ($booking_data['rm_data'] as &$roomTypeData) {
+                $availableRooms = isset($roomTypeData['data']['available'])
+                    ? $roomTypeData['data']['available']
+                    : array();
+                $roomTypeData['data']['available'] = isset($availableRooms[$this->id_room])
+                    ? array($this->id_room => $availableRooms[$this->id_room])
+                    : array();
+                $roomTypeData['data']['partially_available'] = array();
+                $roomTypeData['data']['booked'] = array();
+                $roomTypeData['data']['unavailable'] = array();
+            }
+            unset($roomTypeData);
+            $booking_data['stats']['total_rooms'] = 1;
+            $booking_data['stats']['num_avail'] = 0;
+            foreach ($booking_data['rm_data'] as $roomTypeData) {
+                $booking_data['stats']['num_avail'] += count($roomTypeData['data']['available']);
+            }
+            $booking_data['stats']['num_part_avai'] = 0;
+            $booking_data['stats']['num_booked'] = 0;
+            $booking_data['stats']['num_unavail'] = 0;
+            $booking_data['stats']['num_cart'] = 0;
+        }
 
         if ($booking_data) {
             $objHotelRoomType = new HotelRoomType();

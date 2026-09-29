@@ -7,6 +7,7 @@
 				</div>
 				<div class="panel-body">
 					<form method="post" action="" id="room-search-form">
+						<input type="hidden" name="id_room" value="{if isset($id_room)}{$id_room|intval}{else}0{/if}">
 						<div class="row">
 							{* <div class="form-group col-sm-12">
 								<label for="booking_product" class="control-label col-sm-4 required">

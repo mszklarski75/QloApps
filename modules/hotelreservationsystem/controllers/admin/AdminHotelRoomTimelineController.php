@@ -56,12 +56,15 @@ class AdminHotelRoomTimelineController extends ModuleAdminController
             && is_array($orderAccess)
             && !empty($orderAccess['edit'])
             && (int) $orderAccess['edit'] === 1;
+        $canCreateBookings = $this->canCreateBookings();
 
         $this->tpl_view_vars = array_merge($this->tpl_view_vars, array(
             'timeline_hotels' => $hotels,
             'timeline_selected_hotel' => $selectedHotel,
             'timeline_can_edit' => $canEditBookings,
+            'timeline_can_book' => $canCreateBookings,
             'timeline_ajax_url' => $this->context->link->getAdminLink('AdminHotelRoomTimeline'),
+            'timeline_booking_url' => $this->context->link->getAdminLink('AdminHotelRoomsBooking'),
             'timeline_orders_url' => $this->context->link->getAdminLink('AdminOrders'),
             'timeline_orders_token' => Tools::getAdminTokenLite('AdminOrders'),
             'timeline_allow_backdate' => (bool) Configuration::get(
@@ -285,6 +288,57 @@ class AdminHotelRoomTimelineController extends ModuleAdminController
 
         $db->execute('COMMIT');
         $this->sendJson(array('success' => true, 'id_booking' => (int) $movedBookingId));
+    }
+
+    public function ajaxProcessCheckNewStayAvailability()
+    {
+        if (!$this->canCreateBookings()) {
+            $this->sendJson(array('success' => false, 'error' => $this->l('You do not have permission to create bookings.')));
+        }
+
+        $rawRoomId = Tools::getValue('id_room');
+        $idRoom = is_scalar($rawRoomId) && Validate::isUnsignedId((string) $rawRoomId) ? (int) $rawRoomId : 0;
+        $dateFrom = $this->parseIsoDate(Tools::getValue('date_from'));
+        $dateTo = $this->parseIsoDate(Tools::getValue('date_to'));
+        $room = new HotelRoomInformation($idRoom);
+        if (!Validate::isLoadedObject($room)
+            || !$this->employeeCanAccessHotel((int) $room->id_hotel)
+            || (int) $room->id_status !== HotelRoomInformation::STATUS_ACTIVE
+            || !$dateFrom
+            || !$dateTo
+            || strtotime($dateTo) <= strtotime($dateFrom)
+        ) {
+            $this->sendJson(array('success' => false, 'error' => $this->l('The room or requested stay is invalid.')));
+        }
+
+        $backdateConfigKey = $this->context->employee->isSuperAdmin()
+            ? 'PS_BACKDATE_ORDER_SUPERADMIN'
+            : 'PS_BACKDATE_ORDER_EMPLOYEES';
+        if (!Configuration::get($backdateConfigKey) && $dateFrom < date('Y-m-d')) {
+            $this->sendJson(array('success' => false, 'error' => $this->l('Backdated bookings are not allowed for your employee profile.')));
+        }
+
+        // Use QloApps' booking availability model so maintenance blocks, bookings,
+        // cart holds, active room types and length-of-stay rules are all respected.
+        $bookingDetail = new HotelBookingDetail();
+        $availability = $bookingDetail->getBookingData(array(
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'hotel_id' => (int) $room->id_hotel,
+            'id_room_type' => (int) $room->id_product,
+            'search_available' => 1,
+            'search_partial' => 0,
+            'search_booked' => 0,
+            'search_unavai' => 0,
+            'id_cart' => isset($this->context->cart->id) ? (int) $this->context->cart->id : 0,
+            'id_guest' => isset($this->context->cookie->id_guest) ? (int) $this->context->cookie->id_guest : 0,
+        ));
+        $isAvailable = isset($availability['rm_data'][(int) $room->id_product]['data']['available'][$idRoom]);
+        if (!$isAvailable) {
+            $this->sendJson(array('success' => false, 'error' => $this->l('This room is not available for the selected stay.')));
+        }
+
+        $this->sendJson(array('success' => true));
     }
 
     public function ajaxProcessPreviewStayChange()
@@ -534,6 +588,25 @@ class AdminHotelRoomTimelineController extends ModuleAdminController
             && is_array($orderAccess)
             && !empty($orderAccess['edit'])
             && (int) $orderAccess['edit'] === 1;
+    }
+
+    protected function canCreateBookings()
+    {
+        $bookNowAccess = Profile::getProfileAccess(
+            (int) $this->context->employee->id_profile,
+            (int) Tab::getIdFromClassName('AdminHotelRoomsBooking')
+        );
+        $cartAccess = Profile::getProfileAccess(
+            (int) $this->context->employee->id_profile,
+            (int) Tab::getIdFromClassName('AdminCarts')
+        );
+
+        return is_array($bookNowAccess)
+            && !empty($bookNowAccess['view'])
+            && (int) $bookNowAccess['view'] === 1
+            && is_array($cartAccess)
+            && !empty($cartAccess['add'])
+            && (int) $cartAccess['add'] === 1;
     }
 
     protected function employeeCanAccessHotel($idHotel)

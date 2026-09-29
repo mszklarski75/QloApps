@@ -1,11 +1,18 @@
 <div id="qlo-room-timeline"
     data-ajax-url="{$timeline_ajax_url|escape:'htmlall':'UTF-8'}"
+    data-booking-url="{$timeline_booking_url|escape:'htmlall':'UTF-8'}"
     data-hotel="{$timeline_selected_hotel|intval}"
     data-days="{$timeline_range_days|intval}"
     data-can-edit="{if $timeline_can_edit}1{else}0{/if}"
+    data-can-book="{if $timeline_can_book}1{else}0{/if}"
     data-today="{$timeline_today|escape:'htmlall':'UTF-8'}"
     data-l-no-rooms="{l s='No rooms found for this hotel.' mod='hotelreservationsystem'}"
     data-l-no-bookings="{l s='No bookings in this period.' mod='hotelreservationsystem'}"
+    data-l-create-success="{l s='Room availability confirmed. Opening Book Now…' mod='hotelreservationsystem'}"
+    data-l-create-error="{l s='The reservation could not be started.' mod='hotelreservationsystem'}"
+    data-l-create-unavailable="{l s='This room is not available for the selected stay.' mod='hotelreservationsystem'}"
+    data-l-resize-checkin="{l s='Drag to change check-in' mod='hotelreservationsystem'}"
+    data-l-resize-checkout="{l s='Drag to change check-out' mod='hotelreservationsystem'}"
     data-l-load-error="{l s='Could not load the room plan.' mod='hotelreservationsystem'}"
     data-l-move-success="{l s='Room assignment updated.' mod='hotelreservationsystem'}"
     data-l-move-error="{l s='The booking could not be moved.' mod='hotelreservationsystem'}"
@@ -29,6 +36,13 @@
             <p>{l s='Review stays by room, move bookings between rooms, or edit stay dates.' mod='hotelreservationsystem'}</p>
         </div>
         <div class="qlo-timeline-controls">
+            {if $timeline_can_book}
+                <label for="qlo-timeline-mode">{l s='Planner mode' mod='hotelreservationsystem'}</label>
+                <select id="qlo-timeline-mode" class="form-control">
+                    <option value="manage">{l s='Manage bookings' mod='hotelreservationsystem'}</option>
+                    <option value="create">{l s='New reservation' mod='hotelreservationsystem'}</option>
+                </select>
+            {/if}
             <label for="qlo-timeline-hotel">{l s='Hotel' mod='hotelreservationsystem'}</label>
             <select id="qlo-timeline-hotel" class="form-control">
                 {foreach from=$timeline_hotels item=hotel}
@@ -51,7 +65,7 @@
 
     <div class="qlo-timeline-help alert alert-info">
         <strong>{l s='Tip:' mod='hotelreservationsystem'}</strong>
-        {l s='Drag an active booking horizontally to change its stay dates, or to another room of the same type to reassign it. Confirm date changes in the editor. Empty cells do not create bookings; use Book Now for new reservations. The order is recalculated and any balance or refund is settled manually by reception.' mod='hotelreservationsystem'}
+        {l s='In Manage bookings mode, drag an active booking to another room of the same type or drag its left or right edge to adjust the stay. You can also use Edit stay. In New reservation mode, drag across empty dates in a room row to check availability and continue in Book Now. Date changes recalculate the order; reception settles any balance or refund manually.' mod='hotelreservationsystem'}
     </div>
 
     <div class="qlo-timeline-legend">

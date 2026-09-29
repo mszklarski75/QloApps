@@ -178,6 +178,7 @@ $(document).ready(function() {
         return {
             search_id_room_type: $("#search_id_room_type").val(),
             search_id_hotel: $("#search_id_hotel").val(),
+            id_room: $("#id_room").val(),
             search_date_from: $("#search_date_from").val(),
             search_date_to: $("#search_date_to").val(),
         }
@@ -356,6 +357,7 @@ $(document).ready(function() {
                     search_id_room_type: search_id_room_type,
                     search_date_from: search_date_from,
                     search_date_to: search_date_to,
+                    id_room: $("#id_room").val(),
                     opt: 1,
                 },
                 success: function(result) {
@@ -424,6 +426,7 @@ $(document).ready(function() {
                     search_id_room_type: search_id_room_type,
                     search_date_from: search_date_from,
                     search_date_to: search_date_to,
+                    id_room: $("#id_room").val(),
                     opt: 1,
                 },
                 success: function(result) {
@@ -483,6 +486,7 @@ $(document).ready(function() {
                 search_id_room_type: search_id_room_type,
                 search_date_from: search_date_from,
                 search_date_to: search_date_to,
+                id_room: $("#id_room").val(),
                 ajax_delete: ajax_delete,
                 opt: 0,
             },
@@ -543,6 +547,7 @@ $(document).ready(function() {
                 search_id_room_type: search_id_room_type,
                 search_date_from: search_date_from,
                 search_date_to: search_date_to,
+                id_room: $("#id_room").val(),
                 id_hotel: id_hotel,
                 opt: 0,
             },
